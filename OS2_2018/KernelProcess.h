@@ -24,7 +24,7 @@ private:
 
 	std::map<VirtualAddress, Segment*> segments;
 	pte_t* pmt;
-	unsigned long clockHand = 0;
+	PageNum clockHand = 0;
 
 	void initialize(KernelSystem* pSystem);
 	pte_t* getEntryForAddress(VirtualAddress address);
@@ -34,11 +34,12 @@ private:
 	PhysicalAddress ejectPageAndGetFrame_s();
 	PageNum getTotalPhysicalMemory();
 	PageNum getTotalVirtualMemory();
+	void shiftLRU();
 	void printSegmentsTop();
 	void printPmtFromAddress(VirtualAddress address);
 
 	PageNum getActualPhysicalMemory();
-	void printAccessedPercentage();
+	void printPmtStats();
 
 	friend class KernelSystem;
 };
