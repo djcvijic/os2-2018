@@ -65,7 +65,8 @@ typedef struct PTE {
 #define VIRTUAL_ADDRESS_LENGTH 24
 #define PMT_SIZE (1 << (VIRTUAL_ADDRESS_LENGTH - PAGE_OFFSET_LENGTH))
 #define SIZE_OF_PMT_IN_PAGES ((PMT_SIZE * sizeof(pte_t) - 1) / PAGE_SIZE + 1)
-#define PTE_ATTRS_LENGTH 6
+
+#define PTE_FRAME_SHIFT 6
 
 #define ROOT_CLUSTER_ENTRIES (ClusterSize / sizeof(RootClusterEntry))
 #define PROCESS_CLUSTER_ENTRIES (ClusterSize / sizeof(ProcessClusterEntry))

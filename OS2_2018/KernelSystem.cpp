@@ -80,12 +80,14 @@ Time KernelSystem::periodicJob() {
 	// TODO: clock algorithm tick (maybe return zero if this part fails), maybe defragment buddy system,
 	// maybe write dirty pages to partition, maybe swap in some absent stuff, maybe swap out if free space is low...
 
-	//for (auto p : processMap) {
-	//	p.second->pProcess->printAccessedPercentage();
-	//}
+	std::unique_lock<std::mutex> lock(_mutex);
+
+	for (auto p : processMap) {
+	//	p.second->pProcess->printPmtStats();
+	}
 
 	// return the tick length value (should it ever change?)
-	return 18000;
+	return 1000;
 }
 
 Status KernelSystem::access(ProcessId pid, VirtualAddress address, AccessType type) {

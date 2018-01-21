@@ -155,11 +155,11 @@ PhysicalAddress KernelProcess::getPhysicalAddress(VirtualAddress address) {
 		return 0;
 	}
 	pte_t entry = *getEntryForAddress(address);
-	if (!(entry >> PTE_ATTRS_LENGTH) || !(entry & MASK_MAPPED)) {
+	if (!(entry >> PTE_FRAME_SHIFT) || !(entry & MASK_MAPPED)) {
 		return 0;
 	}
-	pte_t frameAddress = (entry >> PTE_ATTRS_LENGTH) << PAGE_OFFSET_LENGTH;
-	unsigned long offset = address % PAGE_SIZE;
+	pte_t frameAddress = (entry >> PTE_FRAME_SHIFT) << PAGE_OFFSET_LENGTH;
+	unsigned offset = address % PAGE_SIZE;
 	return (PhysicalAddress)(frameAddress + offset);
 }
 
@@ -176,13 +176,13 @@ void KernelProcess::initialize(KernelSystem* pSystem) {
 }
 
 pte_t* KernelProcess::getEntryForAddress(VirtualAddress address) {
-	unsigned long entryNumber = address / PAGE_SIZE;
+	PageNum entryNumber = address / PAGE_SIZE;
 	return &(pmt[entryNumber]);
 }
 
 void KernelProcess::getPTE(VirtualAddress address, PTE* pte) {
 	pte_t entry = *getEntryForAddress(address);
-	pte->frame = entry >> PTE_ATTRS_LENGTH;
+	pte->frame = entry >> PTE_FRAME_SHIFT;
 	pte->mapped = entry & MASK_MAPPED;
 	pte->accessed = entry & MASK_ACCESSED;
 	pte->dirty = entry & MASK_DIRTY;
@@ -191,7 +191,7 @@ void KernelProcess::getPTE(VirtualAddress address, PTE* pte) {
 
 void KernelProcess::putPTE(VirtualAddress address, PTE pte) {
 	pte_t* entry = getEntryForAddress(address);
-	*entry = pte.frame << PTE_ATTRS_LENGTH;
+	*entry = pte.frame << PTE_FRAME_SHIFT;
 	if (pte.mapped) *entry = *entry | MASK_MAPPED;
 	if (pte.accessed) *entry = *entry | MASK_ACCESSED;
 	if (pte.dirty) *entry = *entry | MASK_DIRTY;
@@ -200,7 +200,7 @@ void KernelProcess::putPTE(VirtualAddress address, PTE pte) {
 
 Status KernelProcess::accessPTE(VirtualAddress address, AccessType type) {
 	pte_t* entry = getEntryForAddress(address);
-	if (!(*entry >> PTE_ATTRS_LENGTH) || !(*entry & MASK_MAPPED)) {
+	if (!(*entry >> PTE_FRAME_SHIFT) || !(*entry & MASK_MAPPED)) {
 		return PAGE_FAULT;
 	}
 	*entry = *entry | MASK_ACCESSED;
@@ -213,9 +213,9 @@ Status KernelProcess::accessPTE(VirtualAddress address, AccessType type) {
 PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
 	for (PageNum i = 0; i < 2 * PMT_SIZE; i++) {
 		pte_t* entry = &(pmt[clockHand]);
-		unsigned long prevClockHand = clockHand;
+		PageNum prevClockHand = clockHand;
 		clockHand = (clockHand + 1) % PMT_SIZE;
-		if (!(*entry >> PTE_ATTRS_LENGTH)) {
+		if (!(*entry >> PTE_FRAME_SHIFT)) {
 			// don't bother, it's not in physical memory
 			continue;
 		} else if (*entry & MASK_ACCESSED) {
@@ -235,6 +235,7 @@ PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
 			}
 			// remove the frame from pmt
 			pte.frame = 0;
+			pte.accessed = false;
 			putPTE(virtualAddress, pte);
 			// remove the physical space from segment
 			Segment* found = 0;
@@ -309,20 +310,23 @@ PageNum KernelProcess::getActualPhysicalMemory() {
 	return retVal;
 }
 
-void KernelProcess::printAccessedPercentage() {
+void KernelProcess::printPmtStats() {
 	PageNum accessedCount = 0;
+	PageNum lowAddBitsCount = 0;
+	PageNum highAddBitsCount = 0;
 	PageNum dirtyCount = 0;
-	PageNum inMemoryCount = 0;
+	PageNum inMemoryCount = 1;
 	PageNum mappedCount = 1;
 	for (PageNum page = 0; page < PMT_SIZE; page++) {
 		PTE pte;
 		getPTE(page * PAGE_SIZE, &pte);
-		if (pte.accessed) accessedCount++;
-		if (pte.dirty) dirtyCount++;
-		if (pte.frame) inMemoryCount++;
 		if (pte.mapped) mappedCount++;
+		if (pte.mapped && pte.frame) inMemoryCount++;
+		if (pte.mapped && pte.frame && pte.accessed) accessedCount++;
+		if (pte.mapped && pte.frame && pte.dirty) dirtyCount++;
 	}
-	printf("Accessed percentage for process %lu : %f\n", pid, (double)accessedCount / mappedCount);
-	printf("Dirty percentage for process %lu : %f\n", pid, (double)dirtyCount / mappedCount);
-	printf("In-memory percentage for process %lu : %f\n", pid, (double)inMemoryCount / mappedCount);
+	printf("Number of mapped pages for process %lu : %lu\n", pid, mappedCount);
+	printf("Ratio of in-memory to mapped pages for process %lu : %f\n", pid, (double)inMemoryCount / mappedCount);
+	printf("Ratio of accessed to in-memory pages for process %lu : %f\n", pid, (double)accessedCount / inMemoryCount);
+	printf("Ratio of dirty to in-memory pages for process %lu : %f\n", pid, (double)dirtyCount / inMemoryCount);
 }
