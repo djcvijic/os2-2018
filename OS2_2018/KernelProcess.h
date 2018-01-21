@@ -38,6 +38,7 @@ private:
 	void printPmtFromAddress(VirtualAddress address);
 
 	PageNum getActualPhysicalMemory();
+	void printAccessedPercentage();
 
 	friend class KernelSystem;
 };

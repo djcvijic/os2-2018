@@ -308,3 +308,21 @@ PageNum KernelProcess::getActualPhysicalMemory() {
 	}
 	return retVal;
 }
+
+void KernelProcess::printAccessedPercentage() {
+	PageNum accessedCount = 0;
+	PageNum dirtyCount = 0;
+	PageNum inMemoryCount = 0;
+	PageNum mappedCount = 1;
+	for (PageNum page = 0; page < PMT_SIZE; page++) {
+		PTE pte;
+		getPTE(page * PAGE_SIZE, &pte);
+		if (pte.accessed) accessedCount++;
+		if (pte.dirty) dirtyCount++;
+		if (pte.frame) inMemoryCount++;
+		if (pte.mapped) mappedCount++;
+	}
+	printf("Accessed percentage for process %lu : %f\n", pid, (double)accessedCount / mappedCount);
+	printf("Dirty percentage for process %lu : %f\n", pid, (double)dirtyCount / mappedCount);
+	printf("In-memory percentage for process %lu : %f\n", pid, (double)inMemoryCount / mappedCount);
+}
