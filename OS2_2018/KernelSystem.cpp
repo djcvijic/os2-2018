@@ -112,6 +112,7 @@ Status KernelSystem::access(ProcessId pid, VirtualAddress address, AccessType ty
 ClusterNo KernelSystem::getNextFreeCluster() {
 	if (!freeClusterList) {
 		printf("Free cluster list points to zero cluster, which means no free clusters remain!\n");
+		printf("Root clusters: %lu, process clusters: %lu, page clusters: %lu\n", rootClusterCount, processClusterCount, pageClusterCount);
 		throw std::exception();
 	}
 	ClusterNo nextFreeCluster = freeClusterList;
@@ -137,6 +138,7 @@ void KernelSystem::getProcessCluster(ProcessId pid, REPC* ret) {
 			if (entry->pid == 0) {
 				// got to the end without finding the pid, create a new process cluster
 				ret->processCluster = getNextFreeCluster();
+				processClusterCount++;
 				char processBuffer[ClusterSize];
 				memset(processBuffer, 0, ClusterSize);
 				partition->writeCluster(ret->processCluster, processBuffer);
@@ -154,10 +156,12 @@ void KernelSystem::getProcessCluster(ProcessId pid, REPC* ret) {
 
 	// got to the end, haven't found it, and need to create a new root cluster first, then new process cluster *sigh*
 	ret->rootCluster = getNextFreeCluster();
+	rootClusterCount++;
 	*((ClusterNo*)rootBuffer) = ret->rootCluster;
 	partition->writeCluster(prevRootCluster, rootBuffer);
 
 	ret->processCluster = getNextFreeCluster();
+	processClusterCount++;
 	char processBuffer[ClusterSize];
 	memset(processBuffer, 0, ClusterSize);
 	partition->writeCluster(ret->processCluster, processBuffer);
@@ -185,6 +189,7 @@ void KernelSystem::getPageCluster(ClusterNo processCluster, VirtualAddress addre
 			if (entry->address == 0) {
 				// got to the end without finding the pid, create a new page cluster
 				ret->pageCluster = getNextFreeCluster();
+				pageClusterCount++;
 				char pageBuffer[ClusterSize];
 				memset(pageBuffer, 0, ClusterSize);
 				partition->writeCluster(ret->pageCluster, pageBuffer);
@@ -202,10 +207,12 @@ void KernelSystem::getPageCluster(ClusterNo processCluster, VirtualAddress addre
 
 	// got to the end, haven't found it, and need to create a new process cluster first, then new page cluster *sigh*
 	ClusterNo newProcessCluster = getNextFreeCluster();
+	processClusterCount++;
 	*((ClusterNo*)processBuffer) = newProcessCluster;
 	partition->writeCluster(prevProcessCluster, processBuffer);
 
 	ret->pageCluster = getNextFreeCluster();
+	pageClusterCount++;
 	char pageBuffer[ClusterSize];
 	memset(pageBuffer, 0, ClusterSize);
 	partition->writeCluster(ret->pageCluster, pageBuffer);
@@ -219,6 +226,9 @@ void KernelSystem::getPageCluster(ClusterNo processCluster, VirtualAddress addre
 }
 
 void KernelSystem::writeToPartition(ProcessId pid, VirtualAddress startAddress, PageNum pageCount, void* content) {
+	if (startAddress % PAGE_SIZE) {
+		throw std::exception();
+	}
 	REPC repc;
 	getProcessCluster(pid, &repc);
 	for (PageNum currentPage = 0; currentPage < pageCount; currentPage++) {
@@ -240,6 +250,9 @@ void KernelSystem::writeToPartition_s(ProcessId pid, VirtualAddress startAddress
 }
 
 void KernelSystem::erasePageFromPartition_s(ProcessId pid, VirtualAddress address) {
+	if (address % PAGE_SIZE) {
+		throw std::exception();
+	}
 	std::unique_lock<std::mutex> lock(_mutex);
 	REPC repc;
 	getProcessCluster(pid, &repc);
@@ -302,6 +315,9 @@ void KernelSystem::eraseProcessFromPartition_s(ProcessId pid) {
 }
 
 void KernelSystem::loadFromPartition_s(ProcessId pid, VirtualAddress virtualAddress, PhysicalAddress physicalAddress) {
+	if (virtualAddress % PAGE_SIZE) {
+		throw std::exception();
+	}
 	std::unique_lock<std::mutex> lock(_mutex);
 	REPC repc;
 	getProcessCluster(pid, &repc);

@@ -109,20 +109,21 @@ Status KernelProcess::pageFault(VirtualAddress address) {
 	if (!address) {
 		return TRAP;
 	}
+	VirtualAddress pageAddress = (address / PAGE_SIZE) * PAGE_SIZE;
 	PTE pte;
-	getPTE(address, &pte);
+	getPTE(pageAddress, &pte);
 	if (!pte.mapped) {
 		return TRAP;
 	}
 	PhysicalAddress frameAddress = pSystem->takeFromBuddySystem_s(1);
 	if (!frameAddress) {
 		frameAddress = pSystem->ejectPageAndGetFrame_s();
-		pSystem->loadFromPartition_s(pid, address, frameAddress);
+		pSystem->loadFromPartition_s(pid, pageAddress, frameAddress);
 	}
 	pte.frame = (pte_t)frameAddress / PAGE_SIZE;
 	pte.accessed = false;
 	pte.dirty = false;
-	putPTE(address, pte);
+	putPTE(pageAddress, pte);
 
 	Segment* found = 0;
 	for (auto s : segments) {

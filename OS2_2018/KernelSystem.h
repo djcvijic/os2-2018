@@ -38,6 +38,10 @@ private:
 	ProcessId nextPid = 1;
 	ProcessId processClockHand = 0;
 
+	ClusterNo rootClusterCount = 1;
+	ClusterNo processClusterCount = 0;
+	ClusterNo pageClusterCount = 0;
+
 	ClusterNo getNextFreeCluster();
 	void getProcessCluster(ProcessId pid, REPC* ret);
 	void getPageCluster(ClusterNo processCluster, VirtualAddress address, PEPC* ret);
