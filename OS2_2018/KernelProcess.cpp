@@ -109,7 +109,7 @@ Status KernelProcess::pageFault(VirtualAddress address) {
 	if (!address) {
 		return TRAP;
 	}
-	VirtualAddress pageAddress = (address / PAGE_SIZE) * PAGE_SIZE;
+	VirtualAddress pageAddress = address & ~PAGE_OFFSET_MASK;
 	PTE pte;
 	getPTE(pageAddress, &pte);
 	if (!pte.mapped) {
@@ -120,7 +120,7 @@ Status KernelProcess::pageFault(VirtualAddress address) {
 		frameAddress = pSystem->ejectPageAndGetFrame_s();
 		pSystem->loadFromPartition_s(pid, pageAddress, frameAddress);
 	}
-	pte.frame = (uint64_t)frameAddress / PAGE_SIZE;
+	pte.frame = (uint64_t)frameAddress >> PAGE_OFFSET_LENGTH;
 	pte.accessed = false;
 	pte.dirty = false;
 	putPTE(pageAddress, pte);
@@ -211,7 +211,7 @@ Status KernelProcess::accessPTE(VirtualAddress address, AccessType type) {
 }
 
 PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
-	for (PageNum i = 0; i < 2 * PMT_SIZE; i++) {
+	for (PageNum i = 0; i < (PMT_SIZE << 1); i++) {
 		pte_t* entry = &(pmt[clockHand]);
 		PageNum prevClockHand = clockHand;
 		clockHand = (clockHand + 1) % PMT_SIZE;
@@ -224,10 +224,10 @@ PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
 		} else {
 			//printf("Tried %lu entries before ejecting\n", i);
 			// we have got our victim
-			VirtualAddress virtualAddress = prevClockHand * PAGE_SIZE;
+			VirtualAddress virtualAddress = prevClockHand << PAGE_OFFSET_LENGTH;
 			PTE pte;
 			getPTE(virtualAddress, &pte);
-			PhysicalAddress physicalAddress = (PhysicalAddress)(pte.frame * PAGE_SIZE);
+			PhysicalAddress physicalAddress = (PhysicalAddress)(pte.frame << PAGE_OFFSET_LENGTH);
 			if (pte.dirty) {
 				// first write to disk
 				pSystem->writeToPartition(pid, virtualAddress, 1, physicalAddress);
@@ -240,7 +240,7 @@ PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
 			// remove the physical space from segment
 			Segment* found = 0;
 			for (auto s : segments) {
-				if ((virtualAddress >= s.second->startAddress) && (virtualAddress < s.second->startAddress + s.second->size * PAGE_SIZE)) {
+				if ((virtualAddress >= s.second->startAddress) && (virtualAddress < s.second->startAddress + (s.second->size << PAGE_OFFSET_LENGTH))) {
 					found = s.second;
 					break;
 				}

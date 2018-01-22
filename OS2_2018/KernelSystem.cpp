@@ -236,16 +236,16 @@ void KernelSystem::getPageCluster(ClusterNo processCluster, VirtualAddress addre
 }
 
 void KernelSystem::writeToPartition(ProcessId pid, VirtualAddress startAddress, PageNum pageCount, void* content) {
-	if (startAddress % PAGE_SIZE) {
+	if (startAddress & PAGE_OFFSET_MASK) {
 		throw std::exception();
 	}
 	REPC repc;
 	getProcessCluster(pid, &repc);
 	for (PageNum currentPage = 0; currentPage < pageCount; currentPage++) {
-		VirtualAddress currentAddress = startAddress + currentPage * PAGE_SIZE;
+		VirtualAddress currentAddress = startAddress + (currentPage << PAGE_OFFSET_LENGTH);
 		PEPC pepc;
 		getPageCluster(repc.processCluster, currentAddress, &pepc);
-		char* currentContent = (char*)content + currentPage * PAGE_SIZE;
+		char* currentContent = (char*)content + (currentPage << PAGE_OFFSET_LENGTH);
 		partition->writeCluster(pepc.pageCluster, currentContent);
 	}
 
@@ -467,7 +467,7 @@ void KernelSystem::giveToBuddySystem(PhysicalAddress startAddress, PageNum pageC
 	for (PageNum tempBuddySpaceSize = pageCount; tempBuddySpaceSize; tempBuddySpaceSize >>= 1) {
 		if (tempBuddySpaceSize & 1) {
 			buddySystem[currentBuddySystemLevel].insert(startAddress);
-			startAddress = (PhysicalAddress)((uint64_t)startAddress + ((1 << currentBuddySystemLevel) * PAGE_SIZE));
+			startAddress = (PhysicalAddress)((uint64_t)startAddress + ((1 << currentBuddySystemLevel) << PAGE_OFFSET_LENGTH));
 		}
 		currentBuddySystemLevel++;
 	}
@@ -490,11 +490,10 @@ PhysicalAddress KernelSystem::takeFromBuddySystem_s(PageNum pageCount) {
 			auto first = theLevel->begin();
 			PhysicalAddress oldAddr = *first;
 			theLevel->erase(first);
-			PhysicalAddress newAddr = (PhysicalAddress)((uint64_t)oldAddr + (pageCount * PAGE_SIZE));
+			PhysicalAddress newAddr = (PhysicalAddress)((uint64_t)oldAddr + (pageCount << PAGE_OFFSET_LENGTH));
 			PageNum extraSpaceToGiveBack = (1 << currentLevel) - pageCount;
 			if (extraSpaceToGiveBack > 0) {
 				giveToBuddySystem(newAddr, extraSpaceToGiveBack);
-				defragmentBuddySystem();
 			}
 			return oldAddr;
 		}
