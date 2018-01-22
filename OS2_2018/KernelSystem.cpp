@@ -86,8 +86,12 @@ Time KernelSystem::periodicJob() {
 	//	p.second->pProcess->printPmtStats();
 	}
 
+	if (victimProcess) {
+		calculateVictimProcess();
+	}
+
 	// return the tick length value (should it ever change?)
-	return 1000;
+	return 18000;
 }
 
 Status KernelSystem::access(ProcessId pid, VirtualAddress address, AccessType type) {
@@ -336,9 +340,8 @@ void KernelSystem::loadFromPartition_s(ProcessId pid, VirtualAddress virtualAddr
 	//printPageClusterTop(pid, virtualAddress);
 }
 
-PhysicalAddress KernelSystem::ejectPageAndGetFrame_s() {
-	std::unique_lock<std::mutex> lock(_mutex);
-
+void KernelSystem::calculateVictimProcess() {
+	//printf("Calculating victim process\n");
 	// get victim process
 	PageNum totalVirtualMemory = getTotalVirtualMemory();
 	PageNum totalPhysicalMemory = processVMSpaceSize;
@@ -364,17 +367,32 @@ PhysicalAddress KernelSystem::ejectPageAndGetFrame_s() {
 		physicalMemoryRatio = (double)processPhysicalMemory / totalPhysicalMemory;
 		virtualMemoryRatio = (double)processVirtualMemory / totalVirtualMemory;
 		if (physicalMemoryRatio >= virtualMemoryRatio) {
-			PhysicalAddress frame = victimProcess->ejectPageAndGetFrame_s();
-			if (frame) {
-				firstEjectHappened = true;
-				//printf("Done find victim process and eject page\n");
-				return frame;
-			}
+			this->victimProcess = victimProcess;
+			return;
 		}
 	}
 	// we've gone around full circle and not found anything, our math is bad :(
 	//printf("All processes have been checked for victim pages, but none can be ejected\n");
 	throw std::exception();
+}
+
+PhysicalAddress KernelSystem::ejectPageAndGetFrame_s() {
+	std::unique_lock<std::mutex> lock(_mutex);
+
+	if (!victimProcess) {
+		calculateVictimProcess();
+	}
+	PhysicalAddress frame = victimProcess->ejectPageAndGetFrame_s();
+	if (!frame) {
+		calculateVictimProcess();
+		frame = victimProcess->ejectPageAndGetFrame_s();
+		if (!frame) {
+			throw std::exception();
+		}
+	}
+	firstEjectHappened = true;
+	//printf("Done eject page\n");
+	return frame;
 }
 
 PageNum KernelSystem::getTotalVirtualMemory() {

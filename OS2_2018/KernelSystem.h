@@ -37,6 +37,7 @@ private:
 	ProcessMap processMap;
 	ProcessId nextPid = 1;
 	ProcessId processClockHand = 0;
+	KernelProcess* victimProcess = 0;
 
 	ClusterNo rootClusterCount = 1;
 	ClusterNo processClusterCount = 0;
@@ -50,6 +51,7 @@ private:
 	void erasePageFromPartition_s(ProcessId pid, VirtualAddress address);
 	void eraseProcessFromPartition_s(ProcessId pid);
 	void loadFromPartition_s(ProcessId pid, VirtualAddress virtualAddress, PhysicalAddress physicalAddress);
+	void calculateVictimProcess();
 	PhysicalAddress ejectPageAndGetFrame_s();
 	PageNum getTotalVirtualMemory();
 	void printFreeClustersTop();
