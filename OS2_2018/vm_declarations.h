@@ -52,7 +52,7 @@ typedef struct Segment {
 } Segment;
 
 typedef struct PTE {
-	pte_t frame;
+	uint64_t frame;
 	bool mapped;
 	bool accessed;
 	bool dirty;

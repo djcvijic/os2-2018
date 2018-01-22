@@ -120,7 +120,7 @@ Status KernelProcess::pageFault(VirtualAddress address) {
 		frameAddress = pSystem->ejectPageAndGetFrame_s();
 		pSystem->loadFromPartition_s(pid, pageAddress, frameAddress);
 	}
-	pte.frame = (pte_t)frameAddress / PAGE_SIZE;
+	pte.frame = (uint64_t)frameAddress / PAGE_SIZE;
 	pte.accessed = false;
 	pte.dirty = false;
 	putPTE(pageAddress, pte);
@@ -221,8 +221,8 @@ PhysicalAddress KernelProcess::ejectPageAndGetFrame_s() {
 		} else if (*entry & MASK_ACCESSED) {
 			// just reset the accessed bit
 			*entry = *entry & (~MASK_ACCESSED);
-		}
-		else {
+		} else {
+			//printf("Tried %lu entries before ejecting\n", i);
 			// we have got our victim
 			VirtualAddress virtualAddress = prevClockHand * PAGE_SIZE;
 			PTE pte;
